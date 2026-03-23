@@ -4,7 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, Loader2, Lock, Mail } from 'lucide-react';
+import { Shield, Loader2, Lock, Mail, Map, MessageSquare, X, Send, User, Bot, Search, MapPin } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import AIChat from '@/components/AIChat';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -14,6 +16,22 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+
+  // Map Feature State
+  const [collegeSearch, setCollegeSearch] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
+
+  const handleMapSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (collegeSearch.trim()) {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      if (apiKey) {
+        setMapUrl(`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(collegeSearch.trim())}`);
+      } else {
+        setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(collegeSearch.trim())}&t=&z=13&ie=UTF8&iwloc=&output=embed`);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,9 +83,9 @@ export default function Login() {
             <Shield className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="font-display text-4xl font-extrabold tracking-tight">
-            <span className="gradient-text">CampusGate</span>
+            <span className="gradient-text">Smart Campus</span>
           </h1>
-          <p className="mt-2 text-sm font-medium text-muted-foreground tracking-wide">Smart Campus Gate Management</p>
+          <p className="mt-2 text-sm font-medium text-muted-foreground tracking-wide">Management System</p>
         </motion.div>
 
         {/* Login card */}
@@ -130,6 +148,61 @@ export default function Login() {
           <p className="text-xs text-muted-foreground/50">Secured with end-to-end encryption</p>
         </motion.div>
       </motion.div>
+
+      {/* College Map Dialog */}
+      <div className="fixed bottom-8 left-8 z-50">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="h-14 w-14 rounded-2xl border-border/40 bg-card/60 backdrop-blur-md shadow-lg hover:shadow-xl transition-all duration-300">
+              <Map className="h-6 w-6 text-primary" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px] rounded-3xl border-border/30 bg-card/95 backdrop-blur-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Find Your College
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <form onSubmit={handleMapSearch} className="flex gap-2">
+                <Input 
+                  placeholder="Enter college name..." 
+                  value={collegeSearch} 
+                  onChange={(e) => setCollegeSearch(e.target.value)}
+                  className="rounded-xl h-11"
+                />
+                <Button type="submit" className="rounded-xl h-11 px-6">
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
+                </Button>
+              </form>
+              <div className="aspect-video w-full rounded-2xl border border-border/20 overflow-hidden bg-muted/50 flex items-center justify-center">
+                {mapUrl ? (
+                  <iframe 
+                    width="100%" 
+                    height="100%" 
+                    frameBorder="0" 
+                    scrolling="no" 
+                    marginHeight={0} 
+                    marginWidth={0} 
+                    src={mapUrl}
+                  />
+                ) : (
+                  <div className="text-center p-8">
+                    <Map className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">Search for a college to see its location</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Global AI Assistant */}
+      <AIChat />
     </div>
   );
 }
+

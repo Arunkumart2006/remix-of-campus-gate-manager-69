@@ -48,6 +48,7 @@ export default function ManageAccounts() {
   const [fetching, setFetching] = useState(true);
 
   const allowedRoles: Record<string, AppRole[]> = {
+    admin: ['md'],
     md: ['principal', 'hod', 'staff', 'watchman'],
     principal: ['hod', 'staff'],
     hod: ['staff'],
@@ -97,7 +98,7 @@ export default function ManageAccounts() {
           password,
           role: selectedRole,
           full_name: fullName.trim(),
-          institute: selectedRole === 'principal' ? institute.trim() : (profile?.institute || institute.trim() || null),
+          institute: (selectedRole === 'md' || selectedRole === 'principal') ? institute.trim() : (profile?.institute || institute.trim() || null),
           department: (selectedRole === 'hod' || selectedRole === 'staff') ? department.trim() : (profile?.department || null),
         },
       });
@@ -171,10 +172,10 @@ export default function ManageAccounts() {
               </SelectContent>
             </Select>
           </div>
-          {(selectedRole === 'principal' || (role === 'md' && (selectedRole === 'hod' || selectedRole === 'staff'))) && (
+          {(selectedRole === 'md' || selectedRole === 'principal' || (role === 'md' && (selectedRole === 'hod' || selectedRole === 'staff'))) && (
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Institute</Label>
-              <Input value={institute} onChange={(e) => setInstitute(e.target.value)} required={selectedRole === 'principal'} placeholder="e.g. XYZ Engineering College" className="h-11 rounded-xl" />
+              <Input value={institute} onChange={(e) => setInstitute(e.target.value)} required={selectedRole === 'md' || selectedRole === 'principal'} placeholder="e.g. XYZ Engineering College" className="h-11 rounded-xl" />
             </div>
           )}
           {(selectedRole === 'hod' || selectedRole === 'staff') && (
@@ -189,6 +190,7 @@ export default function ManageAccounts() {
           <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-2">
             <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <p className="text-xs text-muted-foreground">
+              {selectedRole === 'md' && 'Managing Director requires an institute name'}
               {selectedRole === 'principal' && 'Principal can create HOD and Staff accounts for their institute'}
               {selectedRole === 'hod' && 'HOD can create Staff accounts for their department'}
               {selectedRole === 'staff' && 'Staff can issue outpasses for students'}
@@ -220,7 +222,6 @@ export default function ManageAccounts() {
                   <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Name</th>
                   <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Role</th>
                   <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Institute</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Department</th>
                   <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Created</th>
                 </tr>
               </thead>
@@ -237,7 +238,6 @@ export default function ManageAccounts() {
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground">{u.institute || '—'}</td>
-                      <td className="px-5 py-3.5 text-muted-foreground">{u.department || '—'}</td>
                       <td className="px-5 py-3.5 text-xs text-muted-foreground">{format(new Date(u.created_at), 'dd MMM yyyy')}</td>
                     </tr>
                   );

@@ -21,10 +21,11 @@ Deno.serve(async (req) => {
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: requestingUser } } = await userClient.auth.getUser();
+    const { data: { user: requestingUser }, error: userError } = await userClient.auth.getUser();
     if (!requestingUser) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      console.error("Auth Error:", userError, "AuthHeader:", authHeader ? "present" : "missing");
+      return new Response(JSON.stringify({ error: `Unauthorized: ${userError?.message || 'No user found'}` }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -41,6 +42,7 @@ Deno.serve(async (req) => {
 
     // Validate hierarchy: who can create whom
     const allowed: Record<string, string[]> = {
+      admin: ["md"],
       md: ["principal", "hod", "staff", "watchman"],
       principal: ["hod", "staff"],
       hod: ["staff"],

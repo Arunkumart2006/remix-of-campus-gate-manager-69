@@ -25,19 +25,21 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import NotificationBell from '@/components/NotificationBell';
 import { motion, AnimatePresence } from 'framer-motion';
+import AIChat from '@/components/AIChat';
 
 type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; roles?: AppRole[] };
 
 const navItems: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/manage-accounts', label: 'Manage Accounts', icon: UserPlus, roles: ['md', 'principal', 'hod'] },
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
+  { path: '/manage-accounts', label: 'Manage Accounts', icon: UserPlus, roles: ['admin', 'md', 'principal', 'hod'] },
   { path: '/outpass', label: 'Outpass', icon: FileCheck, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
   { path: '/bus-entry', label: 'Bus Entry', icon: Bus, roles: ['watchman'] },
   { path: '/visitors', label: 'Visitors', icon: Users, roles: ['watchman'] },
-  { path: '/records', label: 'Records', icon: Search },
+  { path: '/records', label: 'Records', icon: Search, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
 ];
 
 const roleLabels: Record<string, string> = {
+  admin: 'Admin',
   md: 'MD',
   principal: 'Principal',
   hod: 'HOD',
@@ -46,6 +48,7 @@ const roleLabels: Record<string, string> = {
 };
 
 const roleIcons: Record<string, typeof Crown> = {
+  admin: Shield,
   md: Crown,
   principal: GraduationCap,
   hod: Briefcase,
@@ -86,7 +89,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-sidebar-foreground p-1 rounded-lg hover:bg-sidebar-accent transition-colors">
           {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
-        <h1 className="font-display text-lg font-bold text-sidebar-foreground tracking-tight">CampusGate</h1>
+        <h1 className="font-display text-lg font-bold text-sidebar-foreground tracking-tight">Smart Campus</h1>
         <div className="flex items-center gap-2">
           <NotificationBell />
           <button onClick={() => setDark(!dark)} className="text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors p-1 rounded-lg hover:bg-sidebar-accent">
@@ -109,8 +112,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Shield className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-display text-xl font-bold text-sidebar-foreground tracking-tight">CampusGate</h1>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/35">Gate Management</p>
+            <h1 className="font-display text-xl font-bold text-sidebar-foreground tracking-tight">Smart Campus</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sidebar-foreground/35">Management System</p>
           </div>
         </div>
 
@@ -203,6 +206,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto pt-14 md:pt-0">
         <div className="container max-w-6xl py-8 px-4 md:px-8">{children}</div>
       </main>
+
+      {/* Global AI Assistant */}
+      <AIChat />
     </div>
   );
 }

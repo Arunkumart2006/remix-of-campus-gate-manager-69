@@ -39,6 +39,13 @@ export default function Outpass() {
     exit_time: '',
     return_time: '',
   });
+
+  useEffect(() => {
+    if (profile?.department && !form.department) {
+      setForm(prev => ({ ...prev, department: profile.department }));
+    }
+  }, [profile]);
+
   const [isFullDay, setIsFullDay] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<OutpassRecord[]>([]);
@@ -56,14 +63,19 @@ export default function Outpass() {
     let query = supabase
       .from('outpasses')
       .select('*')
-      .in('status', ['active', 'returned'])
       .gte('created_at', todayStart.toISOString())
       .order('created_at', { ascending: false })
       .limit(50);
 
-    // Staff sees only own outpasses
-    if (role === 'staff') {
+    if (role === 'watchman') {
+      // Watchman only needs to see approved and returned outpasses
+      query = query.in('status', ['active', 'returned']);
+    } else if (role === 'staff') {
+      // Staff sees their own outpasses
       query = query.eq('created_by', user?.id ?? '');
+    } else if (role === 'hod' && profile?.department) {
+      // HOD sees outpasses for their department (case-insensitive)
+      query = query.ilike('department', profile.department);
     }
 
     const { data } = await query;
@@ -93,6 +105,7 @@ export default function Outpass() {
       return_time: isFullDay ? null : new Date(form.return_time).toISOString(),
       created_by: user?.id,
       institute: profile?.institute || null,
+      status: role === 'staff' ? 'pending' : 'active',
     } as any);
 
     if (error) {
@@ -211,7 +224,8 @@ export default function Outpass() {
       .eq('id', record.id);
 
     if (error) {
-      toast.error('Failed to mark as returned');
+      console.error('Update Error:', error);
+      toast.error(`Failed to mark as returned: ${error.message} (${error.code})`);
       return;
     }
 
@@ -239,13 +253,23 @@ export default function Outpass() {
       .maybeSingle();
 
     if (error || !data) {
-      toast.error('No active outpass found for this register number');
+      if (error) console.error('Fetch Active Error:', error);
+      toast.error(error ? `Error fetching outpass: ${error.message}` : 'No active outpass found for this register number');
       setReturnLoading(false);
       return;
     }
     await markReturned(data);
     setReturnRegNo('');
     setReturnLoading(false);
+  };
+
+  const updateStatus = async (id: string, newStatus: string) => {
+    const { error } = await supabase.from('outpasses').update({ status: newStatus } as any).eq('id', id);
+    if (error) toast.error('Failed to update status');
+    else {
+      toast.success(`Outpass ${newStatus === 'active' ? 'approved' : 'rejected'}!`);
+      fetchOutpasses();
+    }
   };
 
   const getLateMinutes = (record: OutpassRecord) => {
@@ -306,12 +330,16 @@ export default function Outpass() {
       returned: 'bg-success/15 text-success border border-success/20',
       used: 'bg-muted text-muted-foreground border border-border',
       expired: 'bg-destructive/15 text-destructive border border-destructive/20',
+      pending: 'bg-warning/15 text-warning border border-warning/20',
+      rejected: 'bg-destructive/15 text-destructive border border-destructive/20',
     };
     const labels: Record<string, string> = {
       active: 'Approved',
       returned: 'Returned',
       used: 'Used',
       expired: 'Expired',
+      pending: 'Pending Approval',
+      rejected: 'Rejected',
     };
     return (
       <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold ${styles[record.status] || ''}`}>
@@ -462,6 +490,7 @@ export default function Outpass() {
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">QR</th>
                   {isWatchman && <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Action</th>}
+                  {role === 'hod' && <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Approval</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -530,11 +559,23 @@ export default function Outpass() {
                     </td>
                     {isWatchman && (
                       <td className="px-5 py-3.5">
-                        {!r.returned_at ? (
+                        {!r.returned_at && r.status === 'active' ? (
                           <Button size="sm" variant="outline" onClick={() => markReturned(r)} className="text-xs">
                             <ArrowDownToLine className="mr-1 h-3 w-3" />
                             Mark Returned
                           </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                    )}
+                    {role === 'hod' && (
+                      <td className="px-5 py-3.5">
+                        {r.status === 'pending' ? (
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => updateStatus(r.id, 'active')} className="h-7 text-xs bg-success hover:bg-success/90">Approve</Button>
+                            <Button size="sm" variant="destructive" onClick={() => updateStatus(r.id, 'rejected')} className="h-7 text-xs">Reject</Button>
+                          </div>
                         ) : (
                           <span className="text-xs text-muted-foreground/50">—</span>
                         )}
