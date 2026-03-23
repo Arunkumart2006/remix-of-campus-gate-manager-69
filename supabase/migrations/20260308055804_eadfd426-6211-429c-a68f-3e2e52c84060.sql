@@ -1,0 +1,1 @@
+ALTER TABLE public.outpasses ALTER COLUMN return_time DROP NOT NULL;

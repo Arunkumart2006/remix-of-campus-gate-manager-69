@@ -1,0 +1,2 @@
+ALTER TABLE public.outpasses DROP CONSTRAINT outpasses_status_check;
+ALTER TABLE public.outpasses ADD CONSTRAINT outpasses_status_check CHECK (status = ANY (ARRAY['active'::text, 'used'::text, 'expired'::text, 'returned'::text]));

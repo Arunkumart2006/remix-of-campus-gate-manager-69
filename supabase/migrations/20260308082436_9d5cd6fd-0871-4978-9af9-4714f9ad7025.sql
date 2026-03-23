@@ -1,0 +1,1 @@
+ALTER TABLE public.outpasses ADD COLUMN returned_at timestamp with time zone DEFAULT NULL;
