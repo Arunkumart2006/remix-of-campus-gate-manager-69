@@ -46,7 +46,7 @@ export default function Login() {
         toast.error('Invalid credentials. Please contact the app admin to get an account.');
       } else {
         toast.success('Welcome back!');
-        navigate('/');
+        navigate('/dashboard');
       }
     } finally {
       setLoading(false);
