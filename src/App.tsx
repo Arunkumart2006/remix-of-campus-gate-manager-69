@@ -8,11 +8,13 @@ import AppLayout from "@/components/AppLayout";
 import Login from "@/pages/Login";
 
 import Dashboard from "@/pages/Dashboard";
+import StudentDashboard from "@/pages/StudentDashboard";
 import ManageAccounts from "@/pages/ManageAccounts";
 import BusEntry from "@/pages/BusEntry";
 import Outpass from "@/pages/Outpass";
 import Visitors from "@/pages/Visitors";
 import Records from "@/pages/Records";
+import Payments from "@/pages/Payments";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -52,12 +54,14 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       
-      <Route path="/" element={<ProtectedRoute>{role === 'admin' ? <Navigate to="/manage-accounts" replace /> : <Dashboard />}</ProtectedRoute>} />
-      <Route path="/manage-accounts" element={<ProtectedRoute allowedRoles={['admin', 'md', 'principal', 'hod']}><ManageAccounts /></ProtectedRoute>} />
+      <Route path="/" element={<ProtectedRoute>{role === 'admin' ? <Navigate to="/manage-accounts" replace /> : role === 'student' ? <Navigate to="/student-dashboard" replace /> : <Dashboard />}</ProtectedRoute>} />
+      <Route path="/manage-accounts" element={<ProtectedRoute allowedRoles={['admin', 'md', 'principal', 'hod', 'staff']}><ManageAccounts /></ProtectedRoute>} />
+      <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={['student']}><StudentDashboard /></ProtectedRoute>} />
       <Route path="/bus-entry" element={<ProtectedRoute allowedRoles={['watchman']}><BusEntry /></ProtectedRoute>} />
       <Route path="/outpass" element={<ProtectedRoute allowedRoles={['md', 'principal', 'hod', 'staff', 'watchman']}><Outpass /></ProtectedRoute>} />
       <Route path="/visitors" element={<ProtectedRoute allowedRoles={['watchman']}><Visitors /></ProtectedRoute>} />
       <Route path="/records" element={<ProtectedRoute allowedRoles={['md', 'principal', 'hod', 'staff', 'watchman']}><Records /></ProtectedRoute>} />
+      <Route path="/payments" element={<ProtectedRoute allowedRoles={['admin']}><Payments /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

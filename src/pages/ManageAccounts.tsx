@@ -6,23 +6,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, UserPlus, Users, Crown, GraduationCap, Briefcase, Eye, Sparkles } from 'lucide-react';
+import { Loader2, UserPlus, Users, Crown, GraduationCap, Briefcase, Eye, Sparkles, Shield, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 
 const roleLabels: Record<string, string> = {
-  md: 'Managing Director',
+  admin: 'Admin',
+  md: 'MD',
   principal: 'Principal',
-  hod: 'Head of Department',
+  hod: 'HOD',
   staff: 'Staff',
+  student: 'Student',
   watchman: 'Watchman',
 };
 
 const roleIcons: Record<string, typeof Crown> = {
+  admin: Shield,
   md: Crown,
   principal: GraduationCap,
   hod: Briefcase,
   staff: Users,
+  student: User,
   watchman: Eye,
 };
 
@@ -45,18 +49,20 @@ export default function ManageAccounts() {
   const [department, setDepartment] = useState('');
   const [loading, setLoading] = useState(false);
   const [createdUsers, setCreatedUsers] = useState<CreatedUser[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [fetching, setFetching] = useState(true);
 
   const allowedRoles: Record<string, AppRole[]> = {
     admin: ['md'],
-    md: ['principal', 'hod', 'staff', 'watchman'],
-    principal: ['hod', 'staff'],
-    hod: ['staff'],
+    md: ['principal', 'hod', 'staff', 'student', 'watchman'],
+    principal: ['hod', 'staff', 'student'],
+    hod: ['staff', 'student'],
+    staff: ['student'],
   };
 
   const creatableRoles = role ? (allowedRoles[role] || []) : [];
 
-  const fetchCreatedUsers = async () => {
+  const fetchCreatedUsersAndDepartments = async () => {
     if (!user) return;
     const { data: profiles } = await supabase
       .from('profiles')
@@ -70,10 +76,22 @@ export default function ManageAccounts() {
       const roleMap = new Map((roles || []).map((r: any) => [r.user_id, r.role]));
       setCreatedUsers(profiles.map((p: any) => ({ ...p, role: roleMap.get(p.user_id) || 'unknown' })));
     }
+
+    // Fetch all existing departments in the tenant for the autocomplete
+    const { data: allProfiles } = await supabase
+      .from('profiles')
+      .select('department')
+      .not('department', 'is', null);
+      
+    if (allProfiles) {
+      const uniqueDepts = Array.from(new Set(allProfiles.map((p: any) => p.department).filter(Boolean)));
+      setDepartments(uniqueDepts as string[]);
+    }
+    
     setFetching(false);
   };
 
-  useEffect(() => { fetchCreatedUsers(); }, [user]);
+  useEffect(() => { fetchCreatedUsersAndDepartments(); }, [user]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,16 +117,16 @@ export default function ManageAccounts() {
           role: selectedRole,
           full_name: fullName.trim(),
           institute: (selectedRole === 'md' || selectedRole === 'principal') ? institute.trim() : (profile?.institute || institute.trim() || null),
-          department: (selectedRole === 'hod' || selectedRole === 'staff') ? department.trim() : (profile?.department || null),
+          department: (selectedRole === 'hod' || selectedRole === 'staff' || selectedRole === 'student') ? department.trim() : (profile?.department || null),
         },
       });
 
       if (error) { toast.error('Failed to create account'); return; }
       if (data?.error) { toast.error(data.error); return; }
 
-      toast.success(`${roleLabels[selectedRole]} account created!`);
+      toast.success(`${roleLabels[selectedRole] || selectedRole} account created!`);
       setEmail(''); setPassword(''); setFullName(''); setSelectedRole(''); setInstitute(''); setDepartment('');
-      fetchCreatedUsers();
+      fetchCreatedUsersAndDepartments();
     } finally {
       setLoading(false);
     }
@@ -178,10 +196,13 @@ export default function ManageAccounts() {
               <Input value={institute} onChange={(e) => setInstitute(e.target.value)} required={selectedRole === 'md' || selectedRole === 'principal'} placeholder="e.g. XYZ Engineering College" className="h-11 rounded-xl" />
             </div>
           )}
-          {(selectedRole === 'hod' || selectedRole === 'staff') && (
+          {(selectedRole === 'hod' || selectedRole === 'staff' || selectedRole === 'student') && (
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Department</Label>
-              <Input value={department} onChange={(e) => setDepartment(e.target.value)} required={selectedRole === 'hod'} placeholder="e.g. Computer Science" className="h-11 rounded-xl" />
+              <Input list="department-list" value={department} onChange={(e) => setDepartment(e.target.value)} required={selectedRole === 'hod'} placeholder="e.g. Computer Science" className="h-11 rounded-xl" />
+              <datalist id="department-list">
+                {departments.map(d => <option key={d} value={d} />)}
+              </datalist>
             </div>
           )}
         </div>

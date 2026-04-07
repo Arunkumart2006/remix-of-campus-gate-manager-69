@@ -20,6 +20,7 @@ import {
   Briefcase,
   Eye,
   ChevronRight,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -31,7 +32,9 @@ type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; role
 
 const navItems: NavItem[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
-  { path: '/manage-accounts', label: 'Manage Accounts', icon: UserPlus, roles: ['admin', 'md', 'principal', 'hod'] },
+  { path: '/student-dashboard', label: 'My Dashboard', icon: LayoutDashboard, roles: ['student'] },
+  { path: '/manage-accounts', label: 'Manage Accounts', icon: UserPlus, roles: ['admin', 'md', 'principal', 'hod', 'staff'] },
+  { path: '/payments', label: 'Payments', icon: CreditCard, roles: ['admin'] },
   { path: '/outpass', label: 'Outpass', icon: FileCheck, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
   { path: '/bus-entry', label: 'Bus Entry', icon: Bus, roles: ['watchman'] },
   { path: '/visitors', label: 'Visitors', icon: Users, roles: ['watchman'] },
@@ -44,6 +47,7 @@ const roleLabels: Record<string, string> = {
   principal: 'Principal',
   hod: 'HOD',
   staff: 'Staff',
+  student: 'Student',
   watchman: 'Watchman',
 };
 
@@ -53,6 +57,7 @@ const roleIcons: Record<string, typeof Crown> = {
   principal: GraduationCap,
   hod: Briefcase,
   staff: Users,
+  student: GraduationCap,
   watchman: Eye,
 };
 

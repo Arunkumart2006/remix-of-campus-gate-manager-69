@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Bus, FileCheck, Users, Loader2, Clock, CheckCircle, TrendingUp, AlertTriangle, Crown, Activity } from 'lucide-react';
+import { toast } from 'sonner';
+import { Bus, FileCheck, Users, Loader2, Clock, CheckCircle, TrendingUp, AlertTriangle, Crown, Activity, IndianRupee } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Stats {
   totalOutpasses: number;
@@ -12,6 +19,7 @@ interface Stats {
   busesToday: number;
   visitorsToday: number;
   totalAccounts: number;
+  totalRevenue: number;
 }
 
 interface LateStudent {
@@ -21,6 +29,14 @@ interface LateStudent {
   department: string;
   reason: string;
   return_time: string;
+}
+
+interface Subscription {
+  id: string;
+  status: string;
+  end_date: string | null;
+  amount: number | null;
+  institute: string | null;
 }
 
 const roleLabels: Record<string, string> = {
@@ -49,9 +65,61 @@ const iconBgs = [
 
 export default function Dashboard() {
   const { role, user, profile } = useAuth();
-  const [stats, setStats] = useState<Stats>({ totalOutpasses: 0, activeOutpasses: 0, usedOutpasses: 0, busesToday: 0, visitorsToday: 0, totalAccounts: 0 });
+  const [stats, setStats] = useState<Stats>({ totalOutpasses: 0, activeOutpasses: 0, usedOutpasses: 0, busesToday: 0, visitorsToday: 0, totalAccounts: 0, totalRevenue: 0 });
   const [lateStudents, setLateStudents] = useState<LateStudent[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const currentAmount = selectedPlan === 'monthly' ? 1 : 2;
+  
+  // Real UPI URI using the provided VPA for Arun Kumar
+  const upiUri = `upi://pay?pa=arunamutha01-1@okhdfcbank&pn=Arun%20Kumar&am=${currentAmount}&cu=INR&tn=SubscriptionRenewal`;
+
+  const handleRenew = async () => {
+    // We need either an existing subscription ID or the user's institute name to proceed
+    const instituteName = subscription?.institute || profile?.institute;
+    
+    if (!instituteName) {
+      toast.error('Institute information not found in your profile. Please contact support.');
+      return;
+    }
+
+    setProcessingPayment(true);
+    toast.info('Verifying payment with your bank...');
+    
+    // Simulate a short delay for verification
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Calculate extension duration
+    const monthsToAdd = selectedPlan === 'monthly' ? 1 : 12;
+    const currentEndDate = subscription?.end_date ? new Date(subscription.end_date) : new Date();
+    const newEndDate = new Date(currentEndDate);
+    newEndDate.setMonth(newEndDate.getMonth() + monthsToAdd);
+
+    // Using upsert to either update existing or create new
+    const { error } = await supabase
+      .from('subscriptions')
+      .upsert({
+        id: subscription?.id, // If null, Supabase will generate a new UUID or use the unique constraint
+        institute: instituteName,
+        status: 'active',
+        end_date: newEndDate.toISOString(),
+        amount: (subscription?.amount || 0) + currentAmount,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'institute' });
+
+    if (error) {
+      console.error('Subscription error:', error);
+      toast.error(`Failed to process subscription: ${error.message}`);
+    } else {
+      toast.success(`Payment of ₹${currentAmount.toLocaleString()} confirmed! Subscription ${subscription ? 'extended' : 'activated'} for ${instituteName}.`);
+      setShowPaymentDialog(false);
+      setTimeout(() => window.location.reload(), 1500);
+    }
+    setProcessingPayment(false);
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -74,7 +142,7 @@ export default function Dashboard() {
       const { data: lateData } = await lateQuery;
       setLateStudents((lateData as LateStudent[]) || []);
 
-      const newStats: Stats = { totalOutpasses: 0, activeOutpasses: 0, usedOutpasses: 0, busesToday: 0, visitorsToday: 0, totalAccounts: 0 };
+      const newStats: Stats = { totalOutpasses: 0, activeOutpasses: 0, usedOutpasses: 0, busesToday: 0, visitorsToday: 0, totalAccounts: 0, totalRevenue: 0 };
 
       if (role === 'watchman') {
         const [busRes, outpassRes, visitorRes] = await Promise.all([
@@ -95,20 +163,34 @@ export default function Dashboard() {
         newStats.activeOutpasses = activeRes.count ?? 0;
         newStats.usedOutpasses = usedRes.count ?? 0;
       } else {
-        const [totalRes, activeRes, usedRes, busRes, visitorRes, accountsRes] = await Promise.all([
+        const newStatsCopy: Stats = { totalOutpasses: 0, activeOutpasses: 0, usedOutpasses: 0, busesToday: 0, visitorsToday: 0, totalAccounts: 0, totalRevenue: 0 };
+        const [totalRes, activeRes, usedRes, busRes, visitorRes, accountsRes, revenueRes] = await Promise.all([
           supabase.from('outpasses').select('id', { count: 'exact', head: true }),
           supabase.from('outpasses').select('id', { count: 'exact', head: true }).eq('status', 'active'),
           supabase.from('outpasses').select('id', { count: 'exact', head: true }).eq('status', 'used'),
           supabase.from('buses').select('id', { count: 'exact', head: true }).gte('entry_time', todayISO),
           supabase.from('visitors').select('id', { count: 'exact', head: true }).gte('entry_time', todayISO),
           supabase.from('profiles').select('user_id', { count: 'exact', head: true }).eq('created_by', user.id),
+          supabase.from('subscriptions').select('amount')
         ]);
-        newStats.totalOutpasses = totalRes.count ?? 0;
-        newStats.activeOutpasses = activeRes.count ?? 0;
-        newStats.usedOutpasses = usedRes.count ?? 0;
-        newStats.busesToday = busRes.count ?? 0;
-        newStats.visitorsToday = visitorRes.count ?? 0;
-        newStats.totalAccounts = accountsRes.count ?? 0;
+        newStatsCopy.totalOutpasses = totalRes.count ?? 0;
+        newStatsCopy.activeOutpasses = activeRes.count ?? 0;
+        newStatsCopy.usedOutpasses = usedRes.count ?? 0;
+        newStatsCopy.busesToday = busRes.count ?? 0;
+        newStatsCopy.visitorsToday = visitorRes.count ?? 0;
+        newStatsCopy.totalAccounts = accountsRes.count ?? 0;
+        newStatsCopy.totalRevenue = (revenueRes.data || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
+        
+        Object.assign(newStats, newStatsCopy);
+
+        if (role === 'md') {
+          const { data: subData } = await supabase
+            .from('subscriptions')
+            .select('id, status, end_date, amount, institute')
+            .eq('institute', profile?.institute || '')
+            .maybeSingle();
+          setSubscription(subData as Subscription | null);
+        }
       }
 
       setStats(newStats);
@@ -149,6 +231,7 @@ export default function Dashboard() {
       { label: 'Buses Today', value: stats.busesToday, icon: Bus },
       { label: 'Visitors Today', value: stats.visitorsToday, icon: Users },
       { label: 'Accounts Created', value: stats.totalAccounts, icon: Crown },
+      ...(role === 'admin' ? [{ label: 'Total Revenue', value: stats.totalRevenue ? `₹${stats.totalRevenue.toLocaleString()}` : '₹0', icon: Activity }] : []),
     ];
   };
 
@@ -197,6 +280,135 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Subscription Status for MD */}
+
+      {/* Subscription Status for MD */}
+      {role === 'md' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="page-card relative overflow-hidden"
+          style={{ border: '1px solid var(--border)' }}
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <Crown size={120} />
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-amber-500" />
+                <h3 className="font-display text-xl font-bold">Subscription Status</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">Manage your institute's subscription and renewal</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-4 sm:gap-8">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Current Plan</p>
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${subscription?.status === 'active' ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
+                  <p className="font-bold text-foreground">Premium Monthly</p>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Renews On</p>
+                <p className="font-bold text-foreground">
+                  {subscription?.end_date ? format(new Date(subscription.end_date), 'dd MMM, yyyy') : 'No Active Plan'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowPaymentDialog(true)}
+                  className="px-6 h-10 rounded-xl font-bold text-sm transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg"
+                  style={{ background: 'var(--gradient-warm)', color: 'white' }}
+                >
+                  Renew Now
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {subscription?.end_date && new Date(subscription.end_date).getTime() - new Date().getTime() < 7 * 24 * 60 * 60 * 1000 && (
+            <div className="mt-6 flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+              <p className="text-sm font-medium text-amber-600">
+                Your subscription expires in less than 7 days. Renew now to avoid service interruption.
+              </p>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Payment Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-bold">Subscription Renewal</DialogTitle>
+            <DialogDescription>
+              Scan the QR code below using any UPI app to make the payment.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="monthly" onValueChange={(v) => setSelectedPlan(v as 'monthly' | 'yearly')} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6 h-11 p-1 rounded-xl">
+              <TabsTrigger value="monthly" className="rounded-lg font-bold">Monthly Plan</TabsTrigger>
+              <TabsTrigger value="yearly" className="rounded-lg font-bold">Yearly Plan</TabsTrigger>
+            </TabsList>
+            
+            <div className="flex flex-col items-center justify-center space-y-6 py-2">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                <div className="relative bg-white p-6 rounded-xl border border-border shadow-xl">
+                  <QRCodeSVG 
+                    value={upiUri}
+                    size={180}
+                    level="H"
+                    includeMargin={false}
+                  />
+                </div>
+                <p className="text-[10px] text-center mt-3 text-muted-foreground uppercase tracking-widest font-bold">Scan to Pay ₹{currentAmount.toLocaleString()}</p>
+              </div>
+              
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Amount to Pay (Auto-filled)</Label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                    {selectedPlan === 'monthly' ? '₹1 / month' : '₹2 / year'}
+                  </span>
+                </div>
+                <div className="h-14 w-full rounded-xl bg-muted/50 border border-border flex items-center px-4 font-display text-2xl font-bold text-foreground">
+                  ₹{currentAmount.toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </Tabs>
+          
+          <DialogFooter className="sm:justify-between flex-row gap-3">
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)} className="flex-1 h-11 rounded-xl font-bold">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRenew}
+              disabled={processingPayment}
+              className="flex-1 h-11 rounded-xl font-bold text-white shadow-lg shadow-amber-500/20" 
+              style={{ background: 'var(--gradient-warm)' }}
+            >
+              {processingPayment ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Confirm Payment'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Late Students Alert */}
       {lateStudents.length > 0 && (

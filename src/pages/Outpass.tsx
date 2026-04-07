@@ -70,11 +70,8 @@ export default function Outpass() {
     if (role === 'watchman') {
       // Watchman only needs to see approved and returned outpasses
       query = query.in('status', ['active', 'returned']);
-    } else if (role === 'staff') {
-      // Staff sees their own outpasses
-      query = query.eq('created_by', user?.id ?? '');
-    } else if (role === 'hod' && profile?.department) {
-      // HOD sees outpasses for their department (case-insensitive)
+    } else if ((role === 'staff' || role === 'hod') && profile?.department) {
+      // Staff and HOD see outpasses for their department (case-insensitive)
       query = query.ilike('department', profile.department);
     }
 
@@ -331,6 +328,7 @@ export default function Outpass() {
       used: 'bg-muted text-muted-foreground border border-border',
       expired: 'bg-destructive/15 text-destructive border border-destructive/20',
       pending: 'bg-warning/15 text-warning border border-warning/20',
+      hod_pending: 'bg-blue-500/15 text-blue-500 border border-blue-500/20',
       rejected: 'bg-destructive/15 text-destructive border border-destructive/20',
     };
     const labels: Record<string, string> = {
@@ -338,7 +336,8 @@ export default function Outpass() {
       returned: 'Returned',
       used: 'Used',
       expired: 'Expired',
-      pending: 'Pending Approval',
+      pending: 'Staff Approval',
+      hod_pending: 'HOD Approval',
       rejected: 'Rejected',
     };
     return (
@@ -490,7 +489,7 @@ export default function Outpass() {
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                   <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">QR</th>
                   {isWatchman && <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Action</th>}
-                  {role === 'hod' && <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Approval</th>}
+                  {(role === 'hod' || role === 'staff') && <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Approval</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -569,9 +568,21 @@ export default function Outpass() {
                         )}
                       </td>
                     )}
-                    {role === 'hod' && (
+                    {role === 'staff' && (
                       <td className="px-5 py-3.5">
                         {r.status === 'pending' ? (
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => updateStatus(r.id, 'hod_pending')} className="h-7 text-xs bg-blue-500 hover:bg-blue-600">Forward to HOD</Button>
+                            <Button size="sm" variant="destructive" onClick={() => updateStatus(r.id, 'rejected')} className="h-7 text-xs">Reject</Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                    )}
+                    {role === 'hod' && (
+                      <td className="px-5 py-3.5">
+                        {(r.status === 'pending' || r.status === 'hod_pending') ? (
                           <div className="flex gap-2">
                             <Button size="sm" onClick={() => updateStatus(r.id, 'active')} className="h-7 text-xs bg-success hover:bg-success/90">Approve</Button>
                             <Button size="sm" variant="destructive" onClick={() => updateStatus(r.id, 'rejected')} className="h-7 text-xs">Reject</Button>

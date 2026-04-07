@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
     const { error: roleErr } = await supabaseAdmin.from("user_roles").insert({
       user_id: newUser.user.id,
       role: "md",
+      md_id: newUser.user.id,
     });
 
     // Create profile
@@ -64,6 +65,7 @@ Deno.serve(async (req) => {
       user_id: newUser.user.id,
       full_name: "JKKN MD",
       institute: "JKKNCET",
+      md_id: newUser.user.id,
     });
 
     return new Response(JSON.stringify({ 

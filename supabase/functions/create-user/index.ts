@@ -43,9 +43,10 @@ Deno.serve(async (req) => {
     // Validate hierarchy: who can create whom
     const allowed: Record<string, string[]> = {
       admin: ["md"],
-      md: ["principal", "hod", "staff", "watchman"],
-      principal: ["hod", "staff"],
-      hod: ["staff"],
+      md: ["principal", "hod", "staff", "watchman", "student"],
+      principal: ["hod", "staff", "student"],
+      hod: ["staff", "student"],
+      staff: ["student"],
     };
 
     if (!creatorRole || !allowed[creatorRole]?.includes(role)) {
@@ -67,10 +68,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Get creator's profile to inherit details and md_id
+    const { data: creatorProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("institute, department, md_id")
+      .eq("user_id", requestingUser.id)
+      .maybeSingle();
+
+    // Determine the md_id for the new user: MDs are their own tenant root, others inherit
+    const assignMdId = role === "md" ? newUser.user.id : creatorProfile?.md_id;
+
     // Assign role
     const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
       user_id: newUser.user.id,
       role,
+      md_id: assignMdId,
     });
 
     if (roleError) {
@@ -80,23 +92,15 @@ Deno.serve(async (req) => {
     }
 
     // Create profile
-    // For principal: inherit institute from creator or use provided
-    // For HOD: inherit institute, use provided department
-    // For staff: inherit institute + department from creator
     let profileInstitute = institute;
     let profileDepartment = department;
 
-    if (creatorRole === "principal" || creatorRole === "hod") {
-      const { data: creatorProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("institute, department")
-        .eq("user_id", requestingUser.id)
-        .maybeSingle();
-      if (creatorProfile) {
+    if (creatorProfile) {
+      if (creatorRole === "principal" || creatorRole === "hod" || creatorRole === "staff") {
         profileInstitute = profileInstitute || creatorProfile.institute;
-        if (creatorRole === "hod") {
-          profileDepartment = profileDepartment || creatorProfile.department;
-        }
+      }
+      if (creatorRole === "hod" || creatorRole === "staff") {
+        profileDepartment = profileDepartment || creatorProfile.department;
       }
     }
 
@@ -106,6 +110,7 @@ Deno.serve(async (req) => {
       institute: profileInstitute || null,
       department: profileDepartment || null,
       created_by: requestingUser.id,
+      md_id: assignMdId,
     });
 
     return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), {
