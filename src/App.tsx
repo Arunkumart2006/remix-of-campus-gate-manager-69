@@ -7,6 +7,9 @@ import { AppRole, AuthProvider, useAuth } from "@/hooks/useAuth";
 import AppLayout from "@/components/AppLayout";
 import Login from "@/pages/Login";
 
+// ✅ ADD THIS (NEW HOME PAGE)
+import Home from "@/pages/Home";
+
 import Dashboard from "@/pages/Dashboard";
 import StudentDashboard from "@/pages/StudentDashboard";
 import ManageAccounts from "@/pages/ManageAccounts";
@@ -20,7 +23,13 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: AppRole[] }) {
+function ProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles?: AppRole[];
+}) {
   const { user, loading, role } = useAuth();
 
   if (loading) {
@@ -31,9 +40,12 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
     );
   }
 
+  // 🔒 If not logged in → go to login
   if (!user) return <Navigate to="/login" replace />;
+
+  // 🔒 Role check
   if (allowedRoles && role && !allowedRoles.includes(role as AppRole)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;
@@ -52,16 +64,100 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-      
-      <Route path="/" element={<ProtectedRoute>{role === 'admin' ? <Navigate to="/manage-accounts" replace /> : role === 'student' ? <Navigate to="/student-dashboard" replace /> : <Dashboard />}</ProtectedRoute>} />
-      <Route path="/manage-accounts" element={<ProtectedRoute allowedRoles={['admin', 'md', 'principal', 'hod', 'staff']}><ManageAccounts /></ProtectedRoute>} />
-      <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={['student']}><StudentDashboard /></ProtectedRoute>} />
-      <Route path="/bus-entry" element={<ProtectedRoute allowedRoles={['watchman']}><BusEntry /></ProtectedRoute>} />
-      <Route path="/outpass" element={<ProtectedRoute allowedRoles={['md', 'principal', 'hod', 'staff', 'watchman']}><Outpass /></ProtectedRoute>} />
-      <Route path="/visitors" element={<ProtectedRoute allowedRoles={['watchman']}><Visitors /></ProtectedRoute>} />
-      <Route path="/records" element={<ProtectedRoute allowedRoles={['md', 'principal', 'hod', 'staff', 'watchman']}><Records /></ProtectedRoute>} />
-      <Route path="/payments" element={<ProtectedRoute allowedRoles={['admin']}><Payments /></ProtectedRoute>} />
+      {/* ✅ PUBLIC HOME PAGE */}
+      <Route path="/" element={<Home />} />
+
+      {/* ✅ LOGIN PAGE */}
+      <Route
+        path="/login"
+        element={user ? <Navigate to="/dashboard" replace /> : <Login />}
+      />
+
+      {/* ✅ DASHBOARD (PROTECTED) */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            {role === "admin" ? (
+              <Navigate to="/manage-accounts" replace />
+            ) : role === "student" ? (
+              <Navigate to="/student-dashboard" replace />
+            ) : (
+              <Dashboard />
+            )}
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ OTHER PROTECTED ROUTES */}
+      <Route
+        path="/manage-accounts"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "md", "principal", "hod", "staff"]}>
+            <ManageAccounts />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/student-dashboard"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <StudentDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/bus-entry"
+        element={
+          <ProtectedRoute allowedRoles={["watchman"]}>
+            <BusEntry />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/outpass"
+        element={
+          <ProtectedRoute
+            allowedRoles={["md", "principal", "hod", "staff", "watchman"]}
+          >
+            <Outpass />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/visitors"
+        element={
+          <ProtectedRoute allowedRoles={["watchman"]}>
+            <Visitors />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/records"
+        element={
+          <ProtectedRoute
+            allowedRoles={["md", "principal", "hod", "staff", "watchman"]}
+          >
+            <Records />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/payments"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <Payments />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ❌ NOT FOUND */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
