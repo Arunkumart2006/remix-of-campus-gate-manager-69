@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, Plus, QrCode, CheckCircle, Search, FileCheck, AlertTriangle, Clock, Calendar, ArrowDownToLine, Bell } from 'lucide-react';
+import { Loader2, Plus, QrCode, CheckCircle, Search, FileCheck, AlertTriangle, Clock, Calendar, ArrowDownToLine, Bell, User as UserIcon } from 'lucide-react';
 import { format, isPast, differenceInMinutes } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { QRCodeSVG } from 'qrcode.react';
@@ -21,6 +21,7 @@ interface OutpassRecord {
   exit_time: string;
   return_time: string | null;
   returned_at: string | null;
+  actual_exit_at: string | null;
   status: string;
   created_at: string;
 }
@@ -53,6 +54,7 @@ export default function Outpass() {
   const [qrDialog, setQrDialog] = useState<OutpassRecord | null>(null);
   const [verifyRegNo, setVerifyRegNo] = useState('');
   const [verifiedOutpass, setVerifiedOutpass] = useState<OutpassRecord | null>(null);
+  const [verifiedStudentProfile, setVerifiedStudentProfile] = useState<any | null>(null);
   const [returnRegNo, setReturnRegNo] = useState('');
   const [returnLoading, setReturnLoading] = useState(false);
 
@@ -68,19 +70,50 @@ export default function Outpass() {
       .limit(50);
 
     if (role === 'watchman') {
-      // Watchman only needs to see approved and returned outpasses
-      query = query.in('status', ['active', 'returned']);
+      // Watchman only needs to see current active and out outpasses
+      query = query.in('status', ['active', 'out']);
     } else if ((role === 'staff' || role === 'hod') && profile?.department) {
       // Staff and HOD see outpasses for their department (case-insensitive)
       query = query.ilike('department', profile.department);
     }
 
     const { data } = await query;
-    setRecords((data as any) || []);
+    const recordsData = (data as any) || [];
+
+    // Auto-cancellation logic: If approved (active) and no exit within 1 hour of scheduled exit
+    const now = new Date();
+    const processedRecords = recordsData.map((record: any) => {
+      if (record.status === 'active' && !record.actual_exit_at) {
+        const exitTime = new Date(record.exit_time);
+        const oneHourLater = new Date(exitTime.getTime() + 60 * 60 * 1000);
+        if (now > oneHourLater) {
+          // Mark as expired in the UI and trigger DB update if it's the current user's responsibility
+          // For now, just mark it visually for consistency
+          return { ...record, status: 'expired' };
+        }
+      }
+      return record;
+    });
+
+    setRecords(processedRecords);
+
+    // Persist auto-cancellation to DB for expired ones
+    const expiredIds = processedRecords
+      .filter((r: any, idx: number) => r.status === 'expired' && recordsData[idx].status === 'active')
+      .map((r: any) => r.id);
+
+    if (expiredIds.length > 0) {
+      await supabase.from('outpasses').update({ status: 'expired' } as any).in('id', expiredIds);
+    }
+
     setFetching(false);
   };
 
-  useEffect(() => { fetchOutpasses(); }, [user, role]);
+  useEffect(() => { 
+    fetchOutpasses();
+    const interval = setInterval(fetchOutpasses, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [user, role]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +172,39 @@ export default function Outpass() {
       return;
     }
     setVerifiedOutpass(data);
+    
+    // Fetch student profile for avatar
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('avatar_url, full_name, department')
+      .eq('register_number', verifyRegNo.trim().toUpperCase())
+      .maybeSingle();
+      
+    setVerifiedStudentProfile(profileData);
+  };
+
+  const handleAllowExit = async () => {
+    if (!verifiedOutpass) return;
+    
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('outpasses')
+      .update({ 
+        status: 'out', 
+        actual_exit_at: now 
+      } as any)
+      .eq('id', verifiedOutpass.id);
+
+    if (error) {
+      toast.error('Failed to record exit');
+      return;
+    }
+
+    toast.success(`${verifiedOutpass.student_name} is cleared to leave! Countdown started.`);
+    setVerifiedOutpass(null);
+    setVerifiedStudentProfile(null);
+    setVerifyRegNo('');
+    fetchOutpasses();
   };
 
   const sendLateNotification = async (outpass: OutpassRecord) => {
@@ -205,6 +271,7 @@ export default function Outpass() {
 
     toast.success(`Outpass verified & closed for ${verifiedOutpass.student_name}`);
     setVerifiedOutpass(null);
+    setVerifiedStudentProfile(null);
     setVerifyRegNo('');
     fetchOutpasses();
   };
@@ -244,14 +311,14 @@ export default function Outpass() {
       .from('outpasses')
       .select('*')
       .eq('register_number', returnRegNo.trim().toUpperCase())
-      .eq('status', 'active')
+      .eq('status', 'out')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (error || !data) {
       if (error) console.error('Fetch Active Error:', error);
-      toast.error(error ? `Error fetching outpass: ${error.message}` : 'No active outpass found for this register number');
+      toast.error(error ? `Error fetching outpass: ${error.message}` : 'No student is currently OUT with this register number');
       setReturnLoading(false);
       return;
     }
@@ -324,6 +391,7 @@ export default function Outpass() {
     }
     const styles: Record<string, string> = {
       active: 'bg-primary/15 text-primary border border-primary/20',
+      out: 'bg-amber-500/15 text-amber-600 border border-amber-500/20 animate-pulse',
       returned: 'bg-success/15 text-success border border-success/20',
       used: 'bg-muted text-muted-foreground border border-border',
       expired: 'bg-destructive/15 text-destructive border border-destructive/20',
@@ -332,10 +400,11 @@ export default function Outpass() {
       rejected: 'bg-destructive/15 text-destructive border border-destructive/20',
     };
     const labels: Record<string, string> = {
-      active: 'Approved',
+      active: 'Approved (Waiting)',
+      out: 'Out of Campus',
       returned: 'Returned',
       used: 'Used',
-      expired: 'Expired',
+      expired: 'Cancelled/Expired',
       pending: 'Staff Approval',
       hod_pending: 'HOD Approval',
       rejected: 'Rejected',
@@ -462,9 +531,19 @@ export default function Outpass() {
 
       {/* Records */}
       <div>
-        <h2 className="mb-4 font-display text-lg font-bold text-foreground">
-          Today's Outpasses
-        </h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold text-foreground">
+            {isWatchman ? 'Current Active Outpasses' : "Today's Outpasses"}
+          </h2>
+          {isWatchman && (
+            <Button variant="outline" size="sm" className="rounded-lg h-8 text-xs font-bold" asChild>
+              <a href="/records" className="flex items-center gap-1.5">
+                <FileCheck className="h-3 w-3" />
+                See Records
+              </a>
+            </Button>
+          )}
+        </div>
         {fetching ? (
           <div className="flex h-32 items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -558,11 +637,13 @@ export default function Outpass() {
                     </td>
                     {isWatchman && (
                       <td className="px-5 py-3.5">
-                        {!r.returned_at && r.status === 'active' ? (
+                        {!r.returned_at && r.status === 'out' ? (
                           <Button size="sm" variant="outline" onClick={() => markReturned(r)} className="text-xs">
                             <ArrowDownToLine className="mr-1 h-3 w-3" />
                             Mark Returned
                           </Button>
+                        ) : !r.returned_at && r.status === 'active' ? (
+                          <span className="text-[10px] bg-warning/10 text-warning-foreground border border-warning/20 px-2 py-0.5 rounded font-medium">Verify at Gate</span>
                         ) : (
                           <span className="text-xs text-muted-foreground/50">—</span>
                         )}
@@ -628,8 +709,10 @@ export default function Outpass() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display flex items-center gap-2">
-              {verifiedOutpass?.status === 'active' && !verifiedOutpass?.returned_at ? (
-                <><CheckCircle className="h-5 w-5 text-success" /> Approved — Can Go Outside</>
+              {verifiedOutpass?.status === 'active' ? (
+                <><CheckCircle className="h-5 w-5 text-warning" /> Approved — Ready for Exit</>
+              ) : verifiedOutpass?.status === 'out' ? (
+                <><Clock className="h-5 w-5 text-amber-500" /> Student is Currently OUT</>
               ) : verifiedOutpass?.returned_at ? (
                 <><CheckCircle className="h-5 w-5 text-primary" /> Already Returned</>
               ) : (
@@ -639,11 +722,38 @@ export default function Outpass() {
           </DialogHeader>
           {verifiedOutpass && (
             <div className="space-y-4">
+              {/* Student Avatar and Identity */}
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/50 border border-border">
+                <div className="h-20 w-20 rounded-xl overflow-hidden border-2 border-primary/20 bg-background flex items-center justify-center shrink-0">
+                  {verifiedStudentProfile?.avatar_url ? (
+                    <img src={verifiedStudentProfile.avatar_url} alt="Student" className="h-full w-full object-cover" />
+                  ) : (
+                    <UserIcon className="h-8 w-8 text-muted-foreground/30" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg text-foreground">{verifiedOutpass.student_name}</h4>
+                  <p className="font-mono text-sm text-muted-foreground">{verifiedOutpass.register_number}</p>
+                  <p className="text-xs text-muted-foreground">{verifiedOutpass.department}</p>
+                </div>
+              </div>
+
               {/* Status Banner */}
-              {verifiedOutpass.status === 'active' && !verifiedOutpass.returned_at && (
-                <div className="flex items-center gap-2 rounded-lg bg-success/10 border border-success/20 px-3 py-2 text-success text-sm font-bold">
-                  <CheckCircle className="h-4 w-4" />
-                  Status: APPROVED — Student is allowed to go outside
+              {verifiedOutpass.status === 'active' && (
+                <div className="flex flex-col gap-2 rounded-lg bg-warning/10 border border-warning/20 px-3 py-2 text-warning text-sm font-bold">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Status: APPROVED — Waiting for Exit
+                  </div>
+                  <p className="text-[10px] font-medium opacity-80 italic">Verified by watchman to ALLOW exit. Countdown starts after exit.</p>
+                </div>
+              )}
+              {verifiedOutpass.status === 'out' && (
+                <div className="flex flex-col gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-amber-600 text-sm font-bold">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Status: OUT — Student left at {format(new Date(verifiedOutpass.actual_exit_at!), 'hh:mm a')}
+                  </div>
                 </div>
               )}
               {verifiedOutpass.returned_at && (
@@ -652,7 +762,13 @@ export default function Outpass() {
                   Status: RETURNED — Already came back at {format(new Date(verifiedOutpass.returned_at), 'hh:mm a')}
                 </div>
               )}
-              {verifiedOutpass.status !== 'active' && !verifiedOutpass.returned_at && (
+              {verifiedOutpass.status === 'expired' && (
+                <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-destructive text-sm font-bold">
+                  <AlertTriangle className="h-4 w-4" />
+                  Status: CANCELLED/EXPIRED — Not used within 1 hour
+                </div>
+              )}
+              {['pending', 'hod_pending', 'rejected'].includes(verifiedOutpass.status) && (
                 <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-destructive text-sm font-bold">
                   <AlertTriangle className="h-4 w-4" />
                   Status: NOT APPROVED — Cannot go outside
@@ -694,8 +810,16 @@ export default function Outpass() {
                 )}
               </div>
               <div className="flex gap-3">
-                {/* Only show action buttons if active and not returned */}
-                {verifiedOutpass.status === 'active' && !verifiedOutpass.returned_at && (
+                {/* Exit flows */}
+                {isWatchman && verifiedOutpass.status === 'active' && (
+                  <Button onClick={handleAllowExit} className="flex-1 bg-warning hover:bg-warning/90 text-warning-foreground">
+                    <ArrowDownToLine className="mr-2 h-4 w-4 rotate-180" />
+                    Allow Exit
+                  </Button>
+                )}
+                
+                {/* Return flows */}
+                {isWatchman && verifiedOutpass.status === 'out' && (
                   <>
                     {verifiedOutpass.return_time && isPast(new Date(verifiedOutpass.return_time)) && (
                       <Button

@@ -67,6 +67,7 @@ export default function Dashboard() {
   const { role, user, profile } = useAuth();
   const [stats, setStats] = useState<Stats>({ totalOutpasses: 0, activeOutpasses: 0, usedOutpasses: 0, busesToday: 0, visitorsToday: 0, totalAccounts: 0, totalRevenue: 0 });
   const [lateStudents, setLateStudents] = useState<LateStudent[]>([]);
+  const [activeOutpasses, setActiveOutpasses] = useState<any[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -153,6 +154,15 @@ export default function Dashboard() {
         newStats.busesToday = busRes.count ?? 0;
         newStats.activeOutpasses = outpassRes.count ?? 0;
         newStats.visitorsToday = visitorRes.count ?? 0;
+
+        // Fetch actual active outpasses for the list
+        const { data: activeList } = await supabase
+          .from('outpasses')
+          .select('*')
+          .in('status', ['active', 'out'])
+          .order('created_at', { ascending: false })
+          .limit(10);
+        setActiveOutpasses(activeList || []);
       } else if (role === 'staff') {
         const [totalRes, activeRes, usedRes] = await Promise.all([
           supabase.from('outpasses').select('id', { count: 'exact', head: true }).eq('created_by', user.id),
@@ -411,7 +421,7 @@ export default function Dashboard() {
       </Dialog>
 
       {/* Late Students Alert */}
-      {lateStudents.length > 0 && (
+      {role !== 'watchman' && lateStudents.length > 0 && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -456,6 +466,66 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+        </motion.div>
+      )}
+      
+      {/* Current Active Outpasses for Watchman */}
+      {role === 'watchman' && activeOutpasses.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="space-y-4"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15">
+                <FileCheck className="h-4 w-4 text-primary" />
+              </div>
+              <h2 className="font-display text-lg font-bold text-foreground">
+                Current Active Outpasses ({activeOutpasses.length})
+              </h2>
+            </div>
+            <Button variant="outline" size="sm" asChild className="rounded-xl h-8 text-xs">
+              <a href="/records">See Records</a>
+            </Button>
+          </div>
+          <div className="table-container">
+            <table className="w-full text-sm">
+              <thead className="table-header">
+                <tr>
+                  <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Student</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Reg No</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">Exit Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {activeOutpasses.map((s, i) => (
+                  <motion.tr
+                    key={s.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="table-row"
+                  >
+                    <td className="px-5 py-3.5 font-semibold text-foreground">{s.student_name}</td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">{s.register_number}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        s.status === 'active' ? 'bg-warning/10 text-warning' : 'bg-amber-500/10 text-amber-600'
+                      }`}>
+                        {s.status === 'active' ? 'Approved' : 'Out Now'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-muted-foreground">
+                      {format(new Date(s.exit_time), 'hh:mm a')}
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-center text-muted-foreground italic">Go to the Outpass page to verify exit or mark return.</p>
         </motion.div>
       )}
     </div>

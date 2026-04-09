@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, Plus, Clock, FileCheck, XCircle, FileClock } from 'lucide-react';
+import { Loader2, Plus, Clock, FileCheck, XCircle, FileClock, User as UserIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 
@@ -28,11 +28,17 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   
   // Form state
-  const [regNumber, setRegNumber] = useState('');
+  const [regNumber, setRegNumber] = useState(profile?.register_number || '');
   const [reason, setReason] = useState('');
   const [exitTime, setExitTime] = useState('');
   const [expectedReturn, setExpectedReturn] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (profile?.register_number && !regNumber) {
+      setRegNumber(profile.register_number);
+    }
+  }, [profile]);
 
   const fetchOutpasses = async () => {
     if (!user) return;

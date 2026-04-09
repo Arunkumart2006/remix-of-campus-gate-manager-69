@@ -18,6 +18,7 @@ import Outpass from "@/pages/Outpass";
 import Visitors from "@/pages/Visitors";
 import Records from "@/pages/Records";
 import Payments from "@/pages/Payments";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -153,6 +154,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <Payments />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         }
       />

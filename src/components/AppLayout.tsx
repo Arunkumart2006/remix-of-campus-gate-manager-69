@@ -21,6 +21,7 @@ import {
   Eye,
   ChevronRight,
   CreditCard,
+  User as UserIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -31,7 +32,7 @@ import AIChat from '@/components/AIChat';
 type NavItem = { path: string; label: string; icon: typeof LayoutDashboard; roles?: AppRole[] };
 
 const navItems: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
   { path: '/student-dashboard', label: 'My Dashboard', icon: LayoutDashboard, roles: ['student'] },
   { path: '/manage-accounts', label: 'Manage Accounts', icon: UserPlus, roles: ['admin', 'md', 'principal', 'hod', 'staff'] },
   { path: '/payments', label: 'Payments', icon: CreditCard, roles: ['admin'] },
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { path: '/bus-entry', label: 'Bus Entry', icon: Bus, roles: ['watchman'] },
   { path: '/visitors', label: 'Visitors', icon: Users, roles: ['watchman'] },
   { path: '/records', label: 'Records', icon: Search, roles: ['md', 'principal', 'hod', 'staff', 'watchman'] },
+  { path: '/profile', label: 'Profile', icon: UserIcon },
 ];
 
 const roleLabels: Record<string, string> = {
@@ -174,10 +176,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           {/* User card */}
           <div className="rounded-2xl bg-sidebar-accent/40 backdrop-blur-sm p-3.5 border border-sidebar-border/50">
-            <p className="text-sm font-semibold text-sidebar-foreground truncate">{profile?.full_name || user?.email}</p>
-            {profile?.institute && <p className="text-[11px] text-sidebar-foreground/40 truncate mt-0.5">{profile.institute}</p>}
-            {profile?.department && <p className="text-[11px] text-sidebar-foreground/40 truncate">{profile.department}</p>}
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider" style={{ background: 'var(--gradient-primary)', color: 'white', boxShadow: '0 2px 8px hsl(245 58% 51% / 0.3)' }}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-primary/20 bg-muted shrink-0">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-sidebar-foreground/30">
+                    <UserIcon size={20} />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-sidebar-foreground truncate">{profile?.full_name || user?.email}</p>
+                {profile?.institute && <p className="text-[10px] text-sidebar-foreground/40 truncate">{profile.institute}</p>}
+              </div>
+            </div>
+            {profile?.department && <p className="text-[11px] text-sidebar-foreground/40 truncate mb-1">{profile.department}</p>}
+            <div className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider" style={{ background: 'var(--gradient-primary)', color: 'white', boxShadow: '0 2px 8px hsl(245 58% 51% / 0.3)' }}>
               <RoleIcon size={10} />
               {roleLabels[role || ''] || 'No role'}
             </div>

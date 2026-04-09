@@ -25,15 +25,9 @@ const Home = () => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate("/login")}
-              className="text-sm font-medium text-gray-300 hover:text-white transition-colors"
-            >
-              Login
-            </button>
-            <button
-              onClick={() => navigate("/signup")}
               className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-medium text-white transition-all duration-200 hover:shadow-lg hover:shadow-blue-600/25 active:scale-95"
             >
-              Sign Up
+              Login
             </button>
           </div>
         </div>
@@ -62,15 +56,9 @@ const Home = () => {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={() => navigate("/login")}
-            className="px-8 py-3.5 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-gray-300 font-medium text-base transition-all duration-200 w-full sm:w-auto text-center"
-          >
-            Login
-          </button>
-          <button
-            onClick={() => navigate("/signup")}
             className="px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-base transition-all duration-200 hover:shadow-xl hover:shadow-blue-600/30 active:scale-95 w-full sm:w-auto text-center"
           >
-            Sign Up
+            Access Dashboard
           </button>
         </div>
 

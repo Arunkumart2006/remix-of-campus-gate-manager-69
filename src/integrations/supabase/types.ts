@@ -23,6 +23,7 @@ export type Database = {
           entry_time: string
           id: string
           institute: string | null
+          md_id: string | null
         }
         Insert: {
           bus_number: string
@@ -54,6 +55,7 @@ export type Database = {
           title: string
           type: string
           user_id: string
+          md_id: string | null
         }
         Insert: {
           created_at?: string
@@ -64,6 +66,7 @@ export type Database = {
           title: string
           type?: string
           user_id: string
+          md_id?: string | null
         }
         Update: {
           created_at?: string
@@ -74,6 +77,7 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
+          md_id?: string | null
         }
         Relationships: [
           {
@@ -99,6 +103,8 @@ export type Database = {
           returned_at: string | null
           status: string
           student_name: string
+          actual_exit_at: string | null
+          md_id: string | null
         }
         Insert: {
           created_at?: string
@@ -113,6 +119,8 @@ export type Database = {
           returned_at?: string | null
           status?: string
           student_name: string
+          actual_exit_at?: string | null
+          md_id?: string | null
         }
         Update: {
           created_at?: string
@@ -127,6 +135,8 @@ export type Database = {
           returned_at?: string | null
           status?: string
           student_name?: string
+          actual_exit_at?: string | null
+          md_id?: string | null
         }
         Relationships: []
       }
@@ -139,6 +149,9 @@ export type Database = {
           id: string
           institute: string | null
           user_id: string
+          avatar_url: string | null
+          register_number: string | null
+          md_id: string | null
         }
         Insert: {
           created_at?: string
@@ -148,6 +161,9 @@ export type Database = {
           id?: string
           institute?: string | null
           user_id: string
+          avatar_url?: string | null
+          register_number?: string | null
+          md_id?: string | null
         }
         Update: {
           created_at?: string
@@ -157,6 +173,9 @@ export type Database = {
           id?: string
           institute?: string | null
           user_id?: string
+          avatar_url?: string | null
+          register_number?: string | null
+          md_id?: string | null
         }
         Relationships: []
       }
@@ -166,18 +185,21 @@ export type Database = {
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+          md_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+          md_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+          md_id?: string | null
         }
         Relationships: []
       }
@@ -192,6 +214,7 @@ export type Database = {
           start_date: string
           status: string
           updated_at: string
+          md_id: string | null
         }
         Insert: {
           amount?: number | null
@@ -203,6 +226,7 @@ export type Database = {
           start_date?: string
           status?: string
           updated_at?: string
+          md_id?: string | null
         }
         Update: {
           amount?: number | null
@@ -258,8 +282,44 @@ export type Database = {
           phone?: string
           purpose?: string
           visitor_name?: string
+          md_id?: string | null
         }
         Relationships: []
+      }
+      password_reset_otps: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          is_used: boolean | null
+          otp_code: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_used?: boolean | null
+          otp_code: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean | null
+          otp_code?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "password_reset_otps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -276,7 +336,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "watchman" | "md" | "principal" | "hod" | "staff"
+      app_role: "admin" | "watchman" | "md" | "principal" | "hod" | "staff" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -404,7 +464,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "watchman", "md", "principal", "hod", "staff"],
+      app_role: ["admin", "watchman", "md", "principal", "hod", "staff", "student"],
     },
   },
 } as const
